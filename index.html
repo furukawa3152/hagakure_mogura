@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>葉隠モグラ - Hagakure Mogura</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #f8c8dc, #c8f8dc);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .game-title {
+            font-size: 2.5em;
+            color: #8B4513;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            margin: 20px 0;
+            font-weight: bold;
+        }
+
+        .game-info {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+            font-size: 1.2em;
+            color: #654321;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .score, .time, .level, .combo {
+            background: rgba(255,255,255,0.8);
+            padding: 10px 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+
+        .combo {
+            background: linear-gradient(45deg, #FFD700, #FFA500);
+            color: #8B4513;
+            font-weight: bold;
+        }
+
+        .combo.high-combo {
+            background: linear-gradient(45deg, #FF6B6B, #FF1493);
+            color: white;
+            animation: comboGlow 0.5s ease-in-out infinite alternate;
+        }
+
+        @keyframes comboGlow {
+            0% { box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+            100% { box-shadow: 0 4px 15px rgba(255,107,107,0.6); }
+        }
+
+        .character-guide {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .character-info {
+            background: rgba(255,255,255,0.9);
+            padding: 10px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            min-width: 100px;
+        }
+
+        .character-info img {
+            width: 40px;
+            height: 40px;
+            object-fit: contain;
+            display: block;
+            margin: 0 auto 5px;
+        }
+
+        .character-info .points {
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+
+        .positive-points {
+            color: #2E8B57;
+        }
+
+        .negative-points {
+            color: #DC143C;
+        }
+
+        .character-info .name {
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        .game-board {
+            display: grid;
+            grid-template-columns: repeat(3, 150px);
+            grid-template-rows: repeat(3, 150px);
+            gap: 20px;
+            background: rgba(255,255,255,0.1);
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+
+        .hole {
+            width: 150px;
+            height: 150px;
+            background: #8B4513;
+            border-radius: 50%;
+            position: relative;
+            cursor: pointer;
+            box-shadow: inset 0 5px 10px rgba(0,0,0,0.5);
+            overflow: hidden;
+            transition: transform 0.1s;
+        }
+
+        .hole:hover {
+            transform: scale(1.05);
+        }
+
+        .character {
+            position: absolute;
+            width: 120px;
+            height: 120px;
+            bottom: -120px;
+            left: 50%;
+            transform: translateX(-50%);
+            transition: bottom 0.3s ease-in-out;
+            cursor: pointer;
+        }
+
+        .character.show {
+            bottom: 10px;
+        }
+
+        .character img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .start-button, .restart-button {
+            background: linear-gradient(45deg, #FF6B6B, #4ECDC4);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.2em;
+            border-radius: 25px;
+            cursor: pointer;
+            margin: 20px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            transition: transform 0.2s;
+        }
+
+        .start-button:hover, .restart-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.3);
+        }
+
+        .game-over {
+            display: none;
+            text-align: center;
+            background: rgba(255,255,255,0.9);
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+
+        .hit-effect {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #FF6B6B;
+            font-size: 2em;
+            font-weight: bold;
+            pointer-events: none;
+            animation: hitAnimation 0.5s ease-out;
+        }
+
+        @keyframes hitAnimation {
+            0% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+            100% { opacity: 0; transform: translate(-50%, -50%) scale(1.5); }
+        }
+    </style>
+</head>
+<body>
+    <h1 class="game-title">🏯 葉隠モグラ 🏯</h1>
+    
+    <div style="text-align: center; margin-bottom: 15px; color: #654321; font-size: 0.9em;">
+        <strong>コンボシステム:</strong> プラスポイントを連続で獲得すると倍率アップ！<br>
+        10コンボ毎に得点が×2, ×3, ×4...と倍増。マイナスポイントでコンボリセット。
+    </div>
+    
+    <div class="character-guide">
+        <div class="character-info">
+            <img src="images/voice-samurai.png" alt="侍">
+            <div class="name">侍</div>
+            <div class="points positive-points">+50点</div>
+        </div>
+        <div class="character-info">
+            <img src="images/voice-ninja1.png" alt="忍者（男）">
+            <div class="name">忍者（男）</div>
+            <div class="points positive-points">+10点</div>
+        </div>
+        <div class="character-info">
+            <img src="images/voice-ninja2.png" alt="忍者（女）">
+            <div class="name">忍者（女）</div>
+            <div class="points negative-points">-20点</div>
+        </div>
+        <div class="character-info">
+            <img src="images/machi-musume.png" alt="町娘">
+            <div class="name">町娘</div>
+            <div class="points negative-points">-100点</div>
+        </div>
+    </div>
+    
+    <div class="game-info">
+        <div class="score">スコア: <span id="score">0</span></div>
+        <div class="time">時間: <span id="time">60</span>秒</div>
+        <div class="level">レベル: <span id="level">1</span></div>
+        <div class="combo" id="comboDisplay">コンボ: <span id="combo">0</span> (×<span id="multiplier">1</span>)</div>
+    </div>
+
+    <div class="game-board" id="gameBoard">
+        <!-- 穴は JavaScript で生成 -->
+    </div>
+
+    <button class="start-button" id="startButton" onclick="startGame()">ゲーム開始</button>
+    
+    <div class="game-over" id="gameOver">
+        <h2>ゲーム終了！</h2>
+        <p>最終スコア: <span id="finalScore">0</span></p>
+        <button class="restart-button" onclick="restartGame()">もう一度プレイ</button>
+    </div>
+
+    <script>
+        // ゲーム変数
+        let score = 0;
+        let timeLeft = 60;
+        let level = 1;
+        let gameActive = false;
+        let gameTimer;
+        let spawnTimer;
+        let currentSpeed = 800; // キャラクター出現間隔（ミリ秒）
+        let combo = 0; // コンボカウント
+        let multiplier = 1; // 得点倍率
+
+        // キャラクターごとのポイントと出現頻度
+        const characterData = {
+            'voice-samurai.png': { points: 50, weight: 1 },      // 侍: 50点, 時々出現
+            'voice-ninja1.png': { points: 10, weight: 5 },      // 忍者（男）: 10点, 頻出
+            'voice-ninja2.png': { points: -20, weight: 3 },     // 忍者（女）: -20点, まあまあ出現
+            'machi-musume.png': { points: -100, weight: 1 }     // 町娘: -100点, 時々出現
+        };
+
+        // 重み付きランダム選択用の配列を作成
+        function createWeightedCharacterArray() {
+            const weightedArray = [];
+            Object.keys(characterData).forEach(character => {
+                const weight = characterData[character].weight;
+                for (let i = 0; i < weight; i++) {
+                    weightedArray.push(character);
+                }
+            });
+            return weightedArray;
+        }
+
+        const weightedCharacters = createWeightedCharacterArray();
+
+        // ゲームボード初期化
+        function initializeBoard() {
+            const gameBoard = document.getElementById('gameBoard');
+            gameBoard.innerHTML = '';
+            
+            for (let i = 0; i < 9; i++) {
+                const hole = document.createElement('div');
+                hole.className = 'hole';
+                hole.id = `hole-${i}`;
+                
+                const character = document.createElement('div');
+                character.className = 'character';
+                character.id = `character-${i}`;
+                character.onclick = () => hitCharacter(i);
+                
+                const img = document.createElement('img');
+                character.appendChild(img);
+                hole.appendChild(character);
+                gameBoard.appendChild(hole);
+            }
+        }
+
+        // ゲーム開始
+        function startGame() {
+            gameActive = true;
+            score = 0;
+            timeLeft = 60;
+            level = 1;
+            currentSpeed = 800;
+            combo = 0;
+            multiplier = 1;
+            
+            updateDisplay();
+            document.getElementById('startButton').style.display = 'none';
+            document.getElementById('gameOver').style.display = 'none';
+            
+            // タイマー開始
+            gameTimer = setInterval(() => {
+                timeLeft--;
+                updateDisplay();
+                
+                // レベルアップ処理（より頻繁に速度アップ）
+                if (timeLeft % 10 === 0 && timeLeft > 0) {
+                    level++;
+                    currentSpeed = Math.max(200, currentSpeed - 100);
+                    updateDisplay();
+                }
+                
+                if (timeLeft <= 0) {
+                    endGame();
+                }
+            }, 1000);
+            
+            // キャラクター出現開始
+            spawnCharacters();
+        }
+
+        // キャラクター出現
+        function spawnCharacters() {
+            if (!gameActive) return;
+            
+            // 複数のキャラクターを同時に出現させる可能性
+            const spawnCount = Math.random() < 0.4 ? 2 : 1; // 40%の確率で2体同時出現
+            
+            for (let i = 0; i < spawnCount; i++) {
+                const randomHole = Math.floor(Math.random() * 9);
+                // 重み付きランダム選択
+                const randomCharacter = 'images/' + weightedCharacters[Math.floor(Math.random() * weightedCharacters.length)];
+                
+                showCharacter(randomHole, randomCharacter);
+            }
+            
+            // ランダム要素を減らしてより頻繁に出現
+            spawnTimer = setTimeout(spawnCharacters, currentSpeed + Math.random() * 300);
+        }
+
+        // キャラクター表示
+        function showCharacter(holeIndex, characterImage) {
+            const character = document.getElementById(`character-${holeIndex}`);
+            const img = character.querySelector('img');
+            
+            // 既に表示されている場合はスキップ
+            if (character.classList.contains('show')) return;
+            
+            img.src = characterImage;
+            character.classList.add('show');
+            character.dataset.character = characterImage.split('/').pop();
+            
+            // 表示時間を短縮してよりスピーディに
+            setTimeout(() => {
+                character.classList.remove('show');
+            }, 1000 + Math.random() * 800);
+        }
+
+        // キャラクターを叩く
+        function hitCharacter(holeIndex) {
+            const character = document.getElementById(`character-${holeIndex}`);
+            
+            if (!gameActive || !character.classList.contains('show')) return;
+            
+            const characterType = character.dataset.character;
+            const basePoints = characterData[characterType]?.points || 0;
+            
+            if (basePoints > 0) {
+                // プラスポイントの場合：コンボ継続、倍率適用
+                combo++;
+                multiplier = Math.floor(combo / 10) + 1;
+                const finalPoints = basePoints * multiplier;
+                score += finalPoints;
+                
+                // コンボエフェクト
+                showHitEffect(holeIndex, `+${finalPoints} (×${multiplier})`, true);
+                updateComboDisplay();
+            } else {
+                // マイナスポイントの場合：コンボリセット、倍率リセット
+                combo = 0;
+                multiplier = 1;
+                score += basePoints; // マイナスポイントはそのまま
+                
+                // ペナルティエフェクト
+                showHitEffect(holeIndex, `${basePoints} COMBO RESET!`, false);
+                updateComboDisplay();
+            }
+            
+            character.classList.remove('show');
+            updateDisplay();
+        }
+
+        // コンボ表示更新
+        function updateComboDisplay() {
+            const comboElement = document.getElementById('comboDisplay');
+            if (combo >= 20) {
+                comboElement.classList.add('high-combo');
+            } else {
+                comboElement.classList.remove('high-combo');
+            }
+        }
+
+        // ヒットエフェクト表示
+        function showHitEffect(holeIndex, text, isPositive) {
+            const hole = document.getElementById(`hole-${holeIndex}`);
+            const effect = document.createElement('div');
+            effect.className = 'hit-effect';
+            effect.textContent = text;
+            effect.style.color = isPositive ? '#2E8B57' : '#DC143C';
+            hole.appendChild(effect);
+            
+            setTimeout(() => {
+                hole.removeChild(effect);
+            }, 500);
+        }
+
+        // 表示更新
+        function updateDisplay() {
+            document.getElementById('score').textContent = score;
+            document.getElementById('time').textContent = timeLeft;
+            document.getElementById('level').textContent = level;
+            document.getElementById('combo').textContent = combo;
+            document.getElementById('multiplier').textContent = multiplier;
+        }
+
+        // ゲーム終了
+        function endGame() {
+            gameActive = false;
+            clearInterval(gameTimer);
+            clearTimeout(spawnTimer);
+            
+            // 全キャラクターを隠す
+            for (let i = 0; i < 9; i++) {
+                document.getElementById(`character-${i}`).classList.remove('show');
+            }
+            
+            document.getElementById('finalScore').textContent = score;
+            document.getElementById('gameOver').style.display = 'block';
+        }
+
+        // ゲーム再開
+        function restartGame() {
+            document.getElementById('startButton').style.display = 'inline-block';
+            document.getElementById('gameOver').style.display = 'none';
+        }
+
+        // 初期化
+        window.onload = function() {
+            initializeBoard();
+        };
+    </script>
+</body>
+</html>
